@@ -9,7 +9,7 @@ const HomePage = () => {
 
   const checkBackendConnection = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/health');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/health`);
       if (response.ok) {
         console.log('Backend connected successfully');
       } else {
@@ -21,8 +21,8 @@ const HomePage = () => {
   };
 
   // Spotify Auth details
-  const CLIENT_ID = 'd88d11f594d146b6a607b0b02f6cf2a3';
-  const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
+  const CLIENT_ID = process.env.REACT_APP_SPOTIFY_CLIENT_ID;
+  const REDIRECT_URI = process.env.REACT_APP_REDIRECT_URI;
   const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
   const SCOPES = [
     'user-top-read',

@@ -41,7 +41,7 @@ const Callback = () => {
         setStatus('Exchanging code for access token...');
 
         // Send code to backend
-        const response = await fetch('http://localhost:5001/api/spotify/token', {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/spotify/token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

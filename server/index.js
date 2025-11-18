@@ -178,9 +178,9 @@ app.post('/api/spotify/token', async (req, res) => {
     console.log('Exchanging Spotify authorization code...');
 
     const tokenUrl = 'https://accounts.spotify.com/api/token';
-    const CLIENT_ID = 'd88d11f594d146b6a607b0b02f6cf2a3';
+    const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
     const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-    const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
+    const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 
     if (!CLIENT_SECRET) {
       return res.status(500).json({

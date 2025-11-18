@@ -99,7 +99,7 @@ const Dashboard = () => {
       setConcertsError(null);
       setConcertGroups([]);
 
-      const response = await fetch(`http://localhost:5001/api/concerts/top-artists/${spotifyIdParam}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/concerts/top-artists/${spotifyIdParam}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch concerts');
@@ -145,7 +145,7 @@ const Dashboard = () => {
       console.log('Fetching user profile for:', spotifyId);
 
       // Fetch user profile and top artists from backend
-      const response = await fetch(`http://localhost:5001/api/user/profile/${spotifyId}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/user/profile/${spotifyId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch user data');
@@ -189,7 +189,7 @@ const Dashboard = () => {
       setLoading(true);
       const spotifyId = localStorage.getItem('spotify_user_id');
 
-      const response = await fetch('http://localhost:5001/api/user/refresh-artists', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/user/refresh-artists`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
