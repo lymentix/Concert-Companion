@@ -12,72 +12,97 @@ const Callback = () => {
     const exchangeCodeForToken = async () => {
       if (hasAttemptedExchange.current) return;
       hasAttemptedExchange.current = true;
-      
-      // Check if we already have a token
+
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+      const errorParam = params.get('error');
+      const isGoogle = state === 'google';
+
+      // Check if we already have a valid session
       const existingToken = localStorage.getItem('spotify_access_token');
-      if (existingToken) {
-        console.log('Token already exists, redirecting...');
+      const existingUserId = localStorage.getItem('user_id');
+      if (existingToken || existingUserId) {
         setStatus('Already authenticated! Redirecting...');
         setTimeout(() => navigate('/dashboard'), 1000);
         return;
       }
-      
+
       try {
-        const params = new URLSearchParams(location.search);
-        const code = params.get('code');
-        const errorParam = params.get('error');
-        
         if (errorParam) {
-          setError(`Spotify authorization error: ${errorParam}`);
+          setError(`Authorization error: ${errorParam}`);
           return;
         }
-        
+
         if (!code) {
           setError('No authorization code found in callback URL');
           return;
         }
 
-        console.log('Authorization code received:', code);
-        setStatus('Exchanging code for access token...');
+        if (isGoogle) {
+          // ── Google OAuth flow ──────────────────────────────────────────
+          setStatus('Signing in with Google...');
 
-        // Send code to backend
-        const response = await fetch('http://localhost:5001/api/spotify/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ code }),
-        });
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/google/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to exchange code for token');
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to complete Google sign-in');
+          }
+
+          const data = await response.json();
+          console.log('✅ Google authentication successful!', data);
+
+          localStorage.setItem('user_id', String(data.user.id));
+          localStorage.setItem('auth_provider', 'google');
+
+          setStatus('Success! Loading your dashboard...');
+          setTimeout(() => navigate('/dashboard'), 1500);
+
+        } else {
+          // ── Spotify OAuth flow ─────────────────────────────────────────
+          setStatus('Exchanging code for access token...');
+
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/spotify/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to exchange code for token');
+          }
+
+          const tokenData = await response.json();
+          console.log('✅ Spotify authentication successful!', tokenData);
+
+          localStorage.setItem('spotify_access_token', tokenData.access_token);
+          localStorage.setItem('spotify_refresh_token', tokenData.refresh_token);
+          localStorage.setItem('spotify_user_id', tokenData.user.spotify_id);
+          localStorage.setItem('auth_provider', 'spotify');
+
+          setStatus('Success! Fetching your music data...');
+          setTimeout(() => navigate('/dashboard'), 1500);
         }
 
-        const tokenData = await response.json();
-        console.log('✅ Authentication successful!', tokenData);
-
-        // Store tokens and user info
-        localStorage.setItem('spotify_access_token', tokenData.access_token);
-        localStorage.setItem('spotify_refresh_token', tokenData.refresh_token);
-        localStorage.setItem('spotify_user_id', tokenData.user.spotify_id);
-
-        setStatus('Success! Fetching your music data...');
-        
-        // Redirect to dashboard
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1500);
-
-      } catch (error) {
-        console.error('❌ Token exchange failed:', error);
-        setError(error.message);
+      } catch (err) {
+        console.error('❌ Token exchange failed:', err);
+        setError(err.message);
         setStatus('Authentication failed');
       }
     };
 
     exchangeCodeForToken();
   }, [location, navigate]);
+
+  const isGoogle = new URLSearchParams(location.search).get('state') === 'google';
+  const accentColor = isGoogle ? '#4285F4' : '#1db954';
+  const providerLabel = isGoogle ? 'Google' : 'Spotify';
 
   return (
     <div style={{ 
@@ -99,7 +124,7 @@ const Callback = () => {
         width: '100%',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
       }}>
-        <h2 style={{ marginBottom: '1rem', color: '#333' }}>Spotify Authentication</h2>
+        <h2 style={{ marginBottom: '1rem', color: '#333' }}>{providerLabel} Authentication</h2>
         
         {!error && (
           <div style={{ margin: '2rem 0' }}>
@@ -107,7 +132,7 @@ const Callback = () => {
               width: '50px',
               height: '50px',
               border: '4px solid #f3f3f3',
-              borderTop: '4px solid #1db954',
+              borderTop: `4px solid ${accentColor}`,
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto'
@@ -134,7 +159,7 @@ const Callback = () => {
               style={{
                 marginTop: '1rem',
                 padding: '0.75rem 1.5rem',
-                background: '#1db954',
+                background: accentColor,
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

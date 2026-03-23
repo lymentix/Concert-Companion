@@ -3,6 +3,7 @@ console.log('Starting Concert Companion Server...');
 
 const spotifyService = require('./services/spotifyService');
 const ticketmasterService = require('./services/ticketmasterService');
+const googleService = require('./services/googleService');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -178,9 +179,9 @@ app.post('/api/spotify/token', async (req, res) => {
     console.log('Exchanging Spotify authorization code...');
 
     const tokenUrl = 'https://accounts.spotify.com/api/token';
-    const CLIENT_ID = 'd88d11f594d146b6a607b0b02f6cf2a3';
+    const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
     const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-    const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
+    const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 
     if (!CLIENT_SECRET) {
       return res.status(500).json({
@@ -400,6 +401,86 @@ app.get('/api/concerts/top-artists/:spotifyId', async (req, res) => {
   }
 });
 
+app.post('/api/auth/google/token', async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Missing authorization code' });
+    }
+
+    if (!process.env.GOOGLE_CLIENT_SECRET) {
+      return res.status(500).json({ error: 'Google Client Secret not configured' });
+    }
+
+    console.log('Exchanging Google authorization code...');
+
+    const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+    const { access_token } = await googleService.exchangeCodeForTokens(code, REDIRECT_URI);
+    const googleProfile = await googleService.getUserInfo(access_token);
+    const user = await googleService.createOrUpdateUser(googleProfile);
+
+    console.log('Google user authenticated:', user.email);
+
+    res.json({
+      user: {
+        id: user.id,
+        google_id: user.google_id,
+        spotify_id: user.spotify_id,
+        display_name: user.display_name,
+        email: user.email,
+        profile_image_url: user.profile_image_url,
+        auth_provider: user.auth_provider,
+      },
+    });
+  } catch (error) {
+    console.error('Google token exchange failed:', error.response?.data || error.message);
+    res.status(500).json({
+      error: 'Failed to complete Google authentication',
+      message: error.message,
+    });
+  }
+});
+
+app.get('/api/user/profile/id/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const result = await query('SELECT * FROM users WHERE id = $1', [userId]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+    const artists = await spotifyService.getUserArtistsFromDB(user.id);
+
+    res.json({
+      user: {
+        id: user.id,
+        google_id: user.google_id,
+        spotify_id: user.spotify_id,
+        display_name: user.display_name,
+        email: user.email,
+        profile_image_url: user.profile_image_url,
+        country: user.country,
+        auth_provider: user.auth_provider,
+      },
+      top_artists: artists,
+    });
+  } catch (error) {
+    console.error('Error fetching user profile by ID:', error);
+    res.status(500).json({
+      error: 'Failed to fetch user profile',
+      message: error.message,
+    });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.stack);
   
@@ -441,8 +522,10 @@ app.listen(PORT, () => {
   console.log('  GET  /api/users     - List all users');
   console.log('  POST /api/users     - Create new user');
   console.log('  POST /api/spotify/token - Exchange Spotify code for token');
-  console.log('  GET /api/user/profile/:spotifyId - Get user profile and artist');
-  console.log('  POST /api/user/refresh-artists  - refresh user\'s top artists');
+  console.log('  POST /api/auth/google/token - Exchange Google code for token');
+  console.log('  GET /api/user/profile/:spotifyId - Get user profile and artists');
+  console.log('  GET /api/user/profile/id/:userId - Get user profile by DB id');
+  console.log('  POST /api/user/refresh-artists  - Refresh user\'s top artists');
   console.log('');
   console.log('🔍 Test with: curl http://localhost:' + PORT + '/api/test-db');
 });

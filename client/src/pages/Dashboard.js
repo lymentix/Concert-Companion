@@ -99,7 +99,7 @@ const Dashboard = () => {
       setConcertsError(null);
       setConcertGroups([]);
 
-      const response = await fetch(`http://localhost:5001/api/concerts/top-artists/${spotifyIdParam}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/concerts/top-artists/${spotifyIdParam}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch concerts');
@@ -130,7 +130,29 @@ const Dashboard = () => {
 
   const fetchUserData = async () => {
     try {
-      // Get stored user data from localStorage
+      const authProvider = localStorage.getItem('auth_provider') || 'spotify';
+
+      if (authProvider === 'google') {
+        const userId = localStorage.getItem('user_id');
+        if (!userId) {
+          navigate('/');
+          return;
+        }
+
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/user/profile/id/${userId}`);
+        if (!response.ok) throw new Error('Failed to fetch user data');
+
+        const data = await response.json();
+        setUser(data.user);
+        setTopArtists(data.top_artists || []);
+        setConcertGroups([]);
+        setConcertMeta(null);
+        setConcertsLoading(false);
+        setLoading(false);
+        return;
+      }
+
+      // ── Spotify flow ────────────────────────────────────────────────
       const spotifyId = localStorage.getItem('spotify_user_id');
       
       if (!spotifyId) {
@@ -145,7 +167,7 @@ const Dashboard = () => {
       console.log('Fetching user profile for:', spotifyId);
 
       // Fetch user profile and top artists from backend
-      const response = await fetch(`http://localhost:5001/api/user/profile/${spotifyId}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/user/profile/${spotifyId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch user data');
@@ -181,15 +203,23 @@ const Dashboard = () => {
     localStorage.removeItem('spotify_access_token');
     localStorage.removeItem('spotify_refresh_token');
     localStorage.removeItem('spotify_user_id');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('auth_provider');
     navigate('/');
   };
 
   const handleRefreshArtists = async () => {
+    const authProvider = localStorage.getItem('auth_provider') || 'spotify';
+    if (authProvider !== 'spotify' && authProvider !== 'both') {
+      alert('Refresh is only available for Spotify-connected accounts.');
+      return;
+    }
+
     try {
       setLoading(true);
       const spotifyId = localStorage.getItem('spotify_user_id');
 
-      const response = await fetch('http://localhost:5001/api/user/refresh-artists', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/user/refresh-artists`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

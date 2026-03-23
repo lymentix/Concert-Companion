@@ -7,16 +7,19 @@ DROP TABLE IF EXISTS users CASCADE;
 -- user account information
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    spotify_id VARCHAR(255) UNIQUE NOT NULL,
+    spotify_id VARCHAR(255) UNIQUE,
+    google_id VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE NOT NULL,
     display_name VARCHAR(255),
     profile_image_url TEXT,
     country VARCHAR(10),
+    auth_provider VARCHAR(50) DEFAULT 'spotify',
     spotify_access_token TEXT,
     spotify_refresh_token TEXT,
     token_expires_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT users_has_provider CHECK (spotify_id IS NOT NULL OR google_id IS NOT NULL)
 );
 
 -- top artists from Spotify
@@ -67,6 +70,7 @@ CREATE TABLE saved_concerts (
 
 -- Create indexes for better query performance
 CREATE INDEX idx_users_spotify_id ON users(spotify_id);
+CREATE INDEX idx_users_google_id ON users(google_id);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_user_artists_user_id ON user_artists(user_id);
 CREATE INDEX idx_user_artists_artist_name ON user_artists(artist_name);
