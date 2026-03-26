@@ -51,6 +51,12 @@ const Dashboard = () => {
     return 'Location TBA';
   };
 
+  const getUberLink = (venue, eventName) => {
+    const parts = [venue?.address, venue?.city, venue?.state, venue?.country].filter(Boolean);
+    const address = parts.join(', ');
+    return `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(address)}&dropoff[nickname]=${encodeURIComponent(eventName || 'Concert Venue')}`;
+  };
+
   const formatPriceRange = (price) => {
     if (!price || (!price.min && !price.max)) {
       return 'Price info coming soon';
@@ -394,14 +400,26 @@ const Dashboard = () => {
                                 <span>{formatEventLocation(event.venue)}</span>
                               </div>
                               <p className="event-price">{formatPriceRange(event.price)}</p>
-                              <a
-                                href={event.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-primary btn-small"
-                              >
-                                View Tickets
-                              </a>
+                              <div className="event-actions">
+                                <a
+                                  href={event.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn btn-primary btn-small"
+                                >
+                                  View Tickets
+                                </a>
+                                {event.venue && (
+                                  <a
+                                    href={getUberLink(event.venue, event.name)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-uber btn-small"
+                                  >
+                                    🚗 Get a Ride
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           </li>
                         ))}
