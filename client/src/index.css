@@ -1,19 +1,15 @@
-/* Import JetBrains Mono for full monospace aesthetic */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+/* Import Sora (display) + DM Sans (body) */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 body {
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0e27;
-  color: #ffffff;
+  background: #0a0a0a;
+  color: #faf7f2;
 }
 
 code {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Sans', monospace;
 }
-
-
-
-

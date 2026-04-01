@@ -245,7 +245,7 @@ const Dashboard = () => {
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="container">
-          <h1>Concert Companion</h1>
+          <h1>Concert <span>Companion</span></h1>
           <button onClick={handleLogout} className="btn btn-logout">
             Logout
           </button>
