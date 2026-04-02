@@ -14,6 +14,9 @@ const Dashboard = () => {
   const [concertsError, setConcertsError] = useState(null);
   const [concertMeta, setConcertMeta] = useState(null);
 
+  const [searchCity, setSearchCity] = useState('');
+  const [searchGenre, setSearchGenre] = useState('');
+
   const formatEventDate = (dateString) => {
     if (!dateString) {
       return 'Date TBA';
@@ -183,6 +186,15 @@ const Dashboard = () => {
     }
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (!searchCity.trim() && !searchGenre.trim()) return;
+    const params = new URLSearchParams();
+    if (searchCity.trim()) params.append('city', searchCity.trim());
+    if (searchGenre.trim()) params.append('genre', searchGenre.trim());
+    navigate(`/search?${params}`);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('spotify_access_token');
     localStorage.removeItem('spotify_refresh_token');
@@ -246,6 +258,29 @@ const Dashboard = () => {
       <header className="dashboard-header">
         <div className="container">
           <h1>Concert <span>Companion</span></h1>
+          <form className="header-search-form" onSubmit={handleSearch}>
+            <input
+              type="text"
+              className="header-search-input"
+              placeholder="City"
+              value={searchCity}
+              onChange={(e) => setSearchCity(e.target.value)}
+            />
+            <input
+              type="text"
+              className="header-search-input"
+              placeholder="Genre"
+              value={searchGenre}
+              onChange={(e) => setSearchGenre(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="header-search-btn"
+              disabled={!searchCity.trim() && !searchGenre.trim()}
+            >
+              Search
+            </button>
+          </form>
           <button onClick={handleLogout} className="btn btn-logout">
             Logout
           </button>
@@ -435,14 +470,12 @@ const Dashboard = () => {
           <section className="next-steps">
             <div className="next-steps-card">
               <h2>What's Next?</h2>
-              <p>Soon you'll be able to:</p>
+              <p>Coming soon:</p>
               <ul>
-                <li>🎫 Find concerts for your favorite artists</li>
-                <li>📍 Search by location and distance</li>
-                <li>🗺️ Get hotel and restaurant recommendations</li>
+                <li>🗺️ Hotel and restaurant recommendations near venues</li>
                 <li>💾 Save and track your concert plans</li>
               </ul>
-              <p className="coming-soon">Coming soon...</p>
+              <p className="coming-soon">Stay tuned...</p>
             </div>
           </section>
         </div>
