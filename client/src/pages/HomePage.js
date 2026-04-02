@@ -1,4 +1,3 @@
-import spotifyLogo from './Spotify_Primary_Logo_RGB_White.png';
 import React, { useState, useEffect } from 'react';
 import './HomePage.css';
 
@@ -39,14 +38,14 @@ const HomePage = () => {
     <div className="homepage">
       <header className="header">
         <div className="container">
-          <h1>Concert Companion</h1>
+          <h1>Concert <span>Companion</span></h1>
         </div>
       </header>
 
       <main className="main">
         <div className="container">
           <section className="hero">
-            <h1>Find Concerts Based on Your Music Taste</h1>
+            <h1>Find <span className="hero-accent">Concerts</span> Based on Your Music Taste</h1>
             <p>Connect your Spotify account to discover concerts you'll love</p>
           </section>
 
@@ -55,13 +54,6 @@ const HomePage = () => {
               <h2>Connect Your Spotify</h2>
               <p>We'll analyze your music taste to recommend concerts</p>
               <button className="btn btn-spotify" onClick={handleSpotifyLogin}>
-                <img src={spotifyLogo} alt="Spotify" className="spotify-logo"
-                  style={{
-                    width: '25px',
-                    height: '25px',
-                    objectFit: 'contain'
-                  }}
-                />
                 Connect Spotify Account
               </button>
               <div className="features-list">

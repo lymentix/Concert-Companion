@@ -400,6 +400,34 @@ app.get('/api/concerts/top-artists/:spotifyId', async (req, res) => {
   }
 });
 
+app.get('/api/concerts/search', async (req, res) => {
+  const { city, genre, limit } = req.query;
+  const size = Math.min(parseInt(limit, 10) || 20, 50);
+
+  if (!city && !genre) {
+    return res.status(400).json({
+      error: 'Please provide at least a city or genre to search.',
+    });
+  }
+
+  try {
+    const events = await ticketmasterService.searchConcerts({ city, genre, size });
+
+    res.json({
+      total: events.length,
+      city: city || null,
+      genre: genre || null,
+      events,
+    });
+  } catch (error) {
+    console.error('Concert search error:', error.message);
+    res.status(500).json({
+      error: 'Failed to search concerts',
+      message: error.message,
+    });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.stack);
   
