@@ -643,6 +643,115 @@
   margin-bottom: 1rem;
 }
 
+/* Save / Saved Buttons */
+.btn-save {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+}
+
+.btn-save:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(29, 185, 84, 0.08);
+}
+
+.btn-saved {
+  background: var(--accent-muted);
+  color: var(--accent);
+  border: 1.5px solid rgba(29, 185, 84, 0.3);
+}
+
+.btn-saved:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.btn-remove {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border);
+}
+
+.btn-remove:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+/* Saved Concerts Section */
+.saved-section {
+  margin-bottom: 4rem;
+  animation: fadeInUp 0.6s ease-out 0.25s backwards;
+}
+
+.saved-count {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.saved-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.saved-event-card {
+  display: flex;
+  gap: 1.25rem;
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 1.15rem 1.25rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  transition: all 0.18s ease;
+  animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.saved-event-card:hover {
+  border-color: var(--border-accent);
+  background: var(--bg-card-hover);
+}
+
+.saved-event-image {
+  flex: 0 0 120px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.saved-event-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.saved-event-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.saved-event-details h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.saved-artist-name {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 /* Next Steps Section */
 .next-steps {
   margin-top: 4rem;
@@ -852,6 +961,16 @@
   }
 
   .concert-event-image {
+    width: 100%;
+    height: 160px;
+  }
+
+  .saved-event-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .saved-event-image {
     width: 100%;
     height: 160px;
   }

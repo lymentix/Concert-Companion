@@ -14,8 +14,13 @@ const Dashboard = () => {
   const [concertsError, setConcertsError] = useState(null);
   const [concertMeta, setConcertMeta] = useState(null);
 
+  const [savedConcerts, setSavedConcerts] = useState([]);
+  const [savedIds, setSavedIds] = useState(new Set());
+  const [savingId, setSavingId] = useState(null);
+
   const [searchCity, setSearchCity] = useState('');
   const [searchGenre, setSearchGenre] = useState('');
+  const [searchArtist, setSearchArtist] = useState('');
 
   const formatEventDate = (dateString) => {
     if (!dateString) {
@@ -54,10 +59,25 @@ const Dashboard = () => {
     return 'Location TBA';
   };
 
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   const getUberLink = (venue, eventName) => {
     const parts = [venue?.address, venue?.city, venue?.state, venue?.country].filter(Boolean);
     const address = parts.join(', ');
-    return `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(address)}&dropoff[nickname]=${encodeURIComponent(eventName || 'Concert Venue')}`;
+
+    const params = new URLSearchParams({
+      action: 'setPickup',
+      pickup: 'my_location',
+      'dropoff[formatted_address]': address,
+      'dropoff[nickname]': eventName || 'Concert Venue',
+    });
+
+    if (venue?.latitude && venue?.longitude) {
+      params.set('dropoff[latitude]', venue.latitude);
+      params.set('dropoff[longitude]', venue.longitude);
+    }
+
+    return `https://m.uber.com/ul/?${params.toString()}`;
   };
 
   const formatPriceRange = (price) => {
@@ -108,7 +128,10 @@ const Dashboard = () => {
       setConcertsError(null);
       setConcertGroups([]);
 
-      const response = await fetch(`http://localhost:5001/api/concerts/top-artists/${spotifyIdParam}`);
+      const appToken = localStorage.getItem('app_token');
+      const response = await fetch(`http://localhost:5001/api/concerts/top-artists/${spotifyIdParam}`, {
+        headers: { 'Authorization': `Bearer ${appToken}` },
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch concerts');
@@ -133,8 +156,52 @@ const Dashboard = () => {
     }
   };
 
+  const fetchSavedConcerts = async () => {
+    try {
+      const appToken = localStorage.getItem('app_token');
+      const response = await fetch('http://localhost:5001/api/concerts/saved', {
+        headers: { 'Authorization': `Bearer ${appToken}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setSavedConcerts(data.events || []);
+      setSavedIds(new Set((data.events || []).map((e) => e.id)));
+    } catch (err) {
+      console.error('Error fetching saved concerts:', err);
+    }
+  };
+
+  const handleSaveConcert = async (event, artistName) => {
+    const appToken = localStorage.getItem('app_token');
+    setSavingId(event.id);
+
+    try {
+      if (savedIds.has(event.id)) {
+        await fetch(`http://localhost:5001/api/concerts/save/${event.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${appToken}` },
+        });
+      } else {
+        await fetch('http://localhost:5001/api/concerts/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${appToken}`,
+          },
+          body: JSON.stringify({ event: { ...event, artistName } }),
+        });
+      }
+      await fetchSavedConcerts();
+    } catch (err) {
+      console.error('Error toggling saved concert:', err);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchUserData();
+    fetchSavedConcerts();
   }, []);
 
   const fetchUserData = async () => {
@@ -154,9 +221,16 @@ const Dashboard = () => {
       console.log('Fetching user profile for:', spotifyId);
 
       // Fetch user profile and top artists from backend
-      const response = await fetch(`http://localhost:5001/api/user/profile/${spotifyId}`);
-      
+      const appToken = localStorage.getItem('app_token');
+      const response = await fetch(`http://localhost:5001/api/user/profile/${spotifyId}`, {
+        headers: { 'Authorization': `Bearer ${appToken}` },
+      });
+
       if (!response.ok) {
+        if (response.status === 401) {
+          navigate('/');
+          return;
+        }
         throw new Error('Failed to fetch user data');
       }
 
@@ -188,10 +262,11 @@ const Dashboard = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (!searchCity.trim() && !searchGenre.trim()) return;
+    if (!searchCity.trim() && !searchGenre.trim() && !searchArtist.trim()) return;
     const params = new URLSearchParams();
     if (searchCity.trim()) params.append('city', searchCity.trim());
     if (searchGenre.trim()) params.append('genre', searchGenre.trim());
+    if (searchArtist.trim()) params.append('artist', searchArtist.trim());
     navigate(`/search?${params}`);
   };
 
@@ -199,6 +274,7 @@ const Dashboard = () => {
     localStorage.removeItem('spotify_access_token');
     localStorage.removeItem('spotify_refresh_token');
     localStorage.removeItem('spotify_user_id');
+    localStorage.removeItem('app_token');
     navigate('/');
   };
 
@@ -207,10 +283,12 @@ const Dashboard = () => {
       setLoading(true);
       const spotifyId = localStorage.getItem('spotify_user_id');
 
+      const appToken = localStorage.getItem('app_token');
       const response = await fetch('http://localhost:5001/api/user/refresh-artists', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${appToken}`,
         },
         body: JSON.stringify({ spotifyId })
       });
@@ -273,10 +351,17 @@ const Dashboard = () => {
               value={searchGenre}
               onChange={(e) => setSearchGenre(e.target.value)}
             />
+            <input
+              type="text"
+              className="header-search-input"
+              placeholder="Artist"
+              value={searchArtist}
+              onChange={(e) => setSearchArtist(e.target.value)}
+            />
             <button
               type="submit"
               className="header-search-btn"
-              disabled={!searchCity.trim() && !searchGenre.trim()}
+              disabled={!searchCity.trim() && !searchGenre.trim() && !searchArtist.trim()}
             >
               Search
             </button>
@@ -444,7 +529,14 @@ const Dashboard = () => {
                                 >
                                   View Tickets
                                 </a>
-                                {event.venue && (
+                                <button
+                                  className={`btn btn-small ${savedIds.has(event.id) ? 'btn-saved' : 'btn-save'}`}
+                                  onClick={() => handleSaveConcert(event, group.artist.name)}
+                                  disabled={savingId === event.id}
+                                >
+                                  {savedIds.has(event.id) ? '✓ Saved' : '💾 Save'}
+                                </button>
+                                {event.venue && isMobile && (
                                   <a
                                     href={getUberLink(event.venue, event.name)}
                                     target="_blank"
@@ -466,6 +558,68 @@ const Dashboard = () => {
             )}
           </section>
 
+          {/* Saved Concerts Section */}
+          {savedConcerts.length > 0 && (
+            <section className="saved-section">
+              <div className="section-header">
+                <h2>Your Concert Plans</h2>
+                <span className="saved-count">{savedConcerts.length} saved</span>
+              </div>
+
+              <ul className="saved-list">
+                {savedConcerts.map((event) => (
+                  <li key={event.id} className="saved-event-card">
+                    {event.imageUrl && (
+                      <div className="saved-event-image">
+                        <img src={event.imageUrl} alt={event.name} />
+                      </div>
+                    )}
+                    <div className="saved-event-details">
+                      <h4>{event.name}</h4>
+                      {event.artistName && (
+                        <p className="saved-artist-name">{event.artistName}</p>
+                      )}
+                      <div className="event-meta">
+                        <span>{formatEventDate(event.date)}</span>
+                        <span>{formatEventLocation(event.venue)}</span>
+                      </div>
+                      <p className="event-price">{formatPriceRange(event.price)}</p>
+                      <div className="event-actions">
+                        {event.url && (
+                          <a
+                            href={event.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-primary btn-small"
+                          >
+                            View Tickets
+                          </a>
+                        )}
+                        {event.venue && isMobile && (
+                          <a
+                            href={getUberLink(event.venue, event.name)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-uber btn-small"
+                          >
+                            🚗 Get a Ride
+                          </a>
+                        )}
+                        <button
+                          className="btn btn-small btn-remove"
+                          onClick={() => handleSaveConcert(event)}
+                          disabled={savingId === event.id}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {/* Next Steps Section */}
           <section className="next-steps">
             <div className="next-steps-card">
@@ -473,7 +627,6 @@ const Dashboard = () => {
               <p>Coming soon:</p>
               <ul>
                 <li>🗺️ Hotel and restaurant recommendations near venues</li>
-                <li>💾 Save and track your concert plans</li>
               </ul>
               <p className="coming-soon">Stay tuned...</p>
             </div>

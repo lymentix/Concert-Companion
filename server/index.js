@@ -8,6 +8,26 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, payload) => {
+    if (err) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    req.user = payload;
+    next();
+  });
+}
 
 const { pool, query } = require('./config/database');
 
@@ -216,11 +236,19 @@ app.post('/api/spotify/token', async (req, res) => {
 
     console.log('User authenticated and data saved!');
 
+    // Issue app-level JWT
+    const appToken = jwt.sign(
+      { userId: user.id, spotifyId: user.spotify_id },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
     // Return tokens and user info
     res.json({
       access_token,
       refresh_token,
       expires_in,
+      app_token: appToken,
       user: {
         id: user.id,
         spotify_id: user.spotify_id,
@@ -241,7 +269,7 @@ app.post('/api/spotify/token', async (req, res) => {
   }
 });
 
-app.get('/api/user/profile/:spotifyId', async (req, res) => {
+app.get('/api/user/profile/:spotifyId', authenticateToken, async (req, res) => {
   try {
     const { spotifyId } = req.params;
     
@@ -278,7 +306,7 @@ app.get('/api/user/profile/:spotifyId', async (req, res) => {
   }
 });
 
-app.post('/api/user/refresh-artists', async (req, res) => {
+app.post('/api/user/refresh-artists', authenticateToken, async (req, res) => {
   try {
     const { spotifyId } = req.body;
     
@@ -323,7 +351,7 @@ app.post('/api/user/refresh-artists', async (req, res) => {
   }
 });
 
-app.get('/api/concerts/top-artists/:spotifyId', async (req, res) => {
+app.get('/api/concerts/top-artists/:spotifyId', authenticateToken, async (req, res) => {
   const { spotifyId } = req.params;
   const eventsPerArtist = Math.min(parseInt(req.query.limit, 10) || 3, 10);
   const artistLimit = Math.min(parseInt(req.query.artists, 10) || 5, 20);
@@ -401,22 +429,23 @@ app.get('/api/concerts/top-artists/:spotifyId', async (req, res) => {
 });
 
 app.get('/api/concerts/search', async (req, res) => {
-  const { city, genre, limit } = req.query;
+  const { city, genre, artist, limit } = req.query;
   const size = Math.min(parseInt(limit, 10) || 20, 50);
 
-  if (!city && !genre) {
+  if (!city && !genre && !artist) {
     return res.status(400).json({
-      error: 'Please provide at least a city or genre to search.',
+      error: 'Please provide at least a city, genre, or artist to search.',
     });
   }
 
   try {
-    const events = await ticketmasterService.searchConcerts({ city, genre, size });
+    const events = await ticketmasterService.searchConcerts({ city, genre, artist, size });
 
     res.json({
       total: events.length,
       city: city || null,
       genre: genre || null,
+      artist: artist || null,
       events,
     });
   } catch (error) {
@@ -425,6 +454,121 @@ app.get('/api/concerts/search', async (req, res) => {
       error: 'Failed to search concerts',
       message: error.message,
     });
+  }
+});
+
+// Save a concert for the authenticated user
+app.post('/api/concerts/save', authenticateToken, async (req, res) => {
+  const { event } = req.body;
+  const userId = req.user.userId;
+
+  if (!event || !event.id) {
+    return res.status(400).json({ error: 'Missing event data' });
+  }
+
+  try {
+    // Upsert into concerts table so we have a local record
+    const concertResult = await query(
+      `INSERT INTO concerts (ticketmaster_id, name, artist_name, venue_name, venue_address, venue_city, venue_state, venue_country, venue_latitude, venue_longitude, event_date, ticket_url, price_min, price_max, image_url, genre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       ON CONFLICT (ticketmaster_id) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [
+        event.id,
+        event.name,
+        event.artistName || null,
+        event.venue?.name || null,
+        event.venue?.address || null,
+        event.venue?.city || null,
+        event.venue?.state || null,
+        event.venue?.country || null,
+        event.venue?.latitude || null,
+        event.venue?.longitude || null,
+        event.date || null,
+        event.url || null,
+        event.price?.min || null,
+        event.price?.max || null,
+        event.imageUrl || null,
+        event.genre || null,
+      ]
+    );
+
+    const concertId = concertResult.rows[0].id;
+
+    // Link user to concert
+    await query(
+      `INSERT INTO saved_concerts (user_id, concert_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, concert_id) DO NOTHING`,
+      [userId, concertId]
+    );
+
+    res.json({ message: 'Concert saved', concertId });
+  } catch (error) {
+    console.error('Error saving concert:', error);
+    res.status(500).json({ error: 'Failed to save concert', message: error.message });
+  }
+});
+
+// Remove a saved concert
+app.delete('/api/concerts/save/:ticketmasterId', authenticateToken, async (req, res) => {
+  const { ticketmasterId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    await query(
+      `DELETE FROM saved_concerts
+       WHERE user_id = $1
+         AND concert_id = (SELECT id FROM concerts WHERE ticketmaster_id = $2)`,
+      [userId, ticketmasterId]
+    );
+
+    res.json({ message: 'Concert removed' });
+  } catch (error) {
+    console.error('Error removing saved concert:', error);
+    res.status(500).json({ error: 'Failed to remove concert', message: error.message });
+  }
+});
+
+// Get all saved concerts for the authenticated user
+app.get('/api/concerts/saved', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const result = await query(
+      `SELECT c.*, sc.notes, sc.saved_at
+       FROM saved_concerts sc
+       JOIN concerts c ON c.id = sc.concert_id
+       WHERE sc.user_id = $1
+       ORDER BY c.event_date ASC NULLS LAST`,
+      [userId]
+    );
+
+    const events = result.rows.map((row) => ({
+      id: row.ticketmaster_id,
+      name: row.name,
+      artistName: row.artist_name,
+      date: row.event_date,
+      url: row.ticket_url,
+      imageUrl: row.image_url,
+      savedAt: row.saved_at,
+      notes: row.notes,
+      price: { min: parseFloat(row.price_min) || null, max: parseFloat(row.price_max) || null },
+      venue: {
+        name: row.venue_name,
+        address: row.venue_address,
+        city: row.venue_city,
+        state: row.venue_state,
+        country: row.venue_country,
+        latitude: row.venue_latitude,
+        longitude: row.venue_longitude,
+      },
+    }));
+
+    res.json({ total: events.length, events });
+  } catch (error) {
+    console.error('Error fetching saved concerts:', error);
+    res.status(500).json({ error: 'Failed to fetch saved concerts', message: error.message });
   }
 });
 
