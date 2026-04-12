@@ -8,6 +8,7 @@ const SearchResults = () => {
 
   const [city, setCity] = useState(searchParams.get('city') || '');
   const [genre, setGenre] = useState(searchParams.get('genre') || '');
+  const [artist, setArtist] = useState(searchParams.get('artist') || '');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,14 +17,15 @@ const SearchResults = () => {
   useEffect(() => {
     const c = searchParams.get('city');
     const g = searchParams.get('genre');
-    if (c || g) {
-      fetchResults(c || '', g || '');
+    const a = searchParams.get('artist');
+    if (c || g || a) {
+      fetchResults(c || '', g || '', a || '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchResults = async (c, g) => {
-    if (!c && !g) return;
+  const fetchResults = async (c, g, a) => {
+    if (!c && !g && !a) return;
 
     setLoading(true);
     setError(null);
@@ -33,13 +35,14 @@ const SearchResults = () => {
       const params = new URLSearchParams();
       if (c) params.append('city', c);
       if (g) params.append('genre', g);
+      if (a) params.append('artist', a);
 
       const response = await fetch(`http://localhost:5001/api/concerts/search?${params}`);
       if (!response.ok) throw new Error('Search failed. Please try again.');
 
       const data = await response.json();
       setResults(data.events || []);
-      setMeta({ city: data.city, genre: data.genre, total: data.total });
+      setMeta({ city: data.city, genre: data.genre, artist: data.artist, total: data.total });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -49,13 +52,14 @@ const SearchResults = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (!city.trim() && !genre.trim()) return;
+    if (!city.trim() && !genre.trim() && !artist.trim()) return;
 
     const params = {};
     if (city.trim()) params.city = city.trim();
     if (genre.trim()) params.genre = genre.trim();
+    if (artist.trim()) params.artist = artist.trim();
     setSearchParams(params);
-    fetchResults(city.trim(), genre.trim());
+    fetchResults(city.trim(), genre.trim(), artist.trim());
   };
 
   const formatEventDate = (dateString) => {
@@ -90,15 +94,31 @@ const SearchResults = () => {
     return `Up to ${formatter.format(price.max)}`;
   };
 
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   const getUberLink = (venue, eventName) => {
     const parts = [venue?.address, venue?.city, venue?.state, venue?.country].filter(Boolean);
     const address = parts.join(', ');
-    return `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(address)}&dropoff[nickname]=${encodeURIComponent(eventName || 'Concert Venue')}`;
+
+    const params = new URLSearchParams({
+      action: 'setPickup',
+      pickup: 'my_location',
+      'dropoff[formatted_address]': address,
+      'dropoff[nickname]': eventName || 'Concert Venue',
+    });
+
+    if (venue?.latitude && venue?.longitude) {
+      params.set('dropoff[latitude]', venue.latitude);
+      params.set('dropoff[longitude]', venue.longitude);
+    }
+
+    return `https://m.uber.com/ul/?${params.toString()}`;
   };
 
   const buildHeading = () => {
     if (!meta) return 'Search Results';
     const parts = [];
+    if (meta.artist) parts.push(meta.artist);
     if (meta.genre) parts.push(meta.genre);
     if (meta.city) parts.push(`in ${meta.city}`);
     return parts.length ? `${parts.join(' ')} concerts` : 'Search Results';
@@ -129,10 +149,17 @@ const SearchResults = () => {
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
             />
+            <input
+              type="text"
+              className="sr-input"
+              placeholder="Artist"
+              value={artist}
+              onChange={(e) => setArtist(e.target.value)}
+            />
             <button
               type="submit"
               className="sr-search-btn"
-              disabled={loading || (!city.trim() && !genre.trim())}
+              disabled={loading || (!city.trim() && !genre.trim() && !artist.trim())}
             >
               Search
             </button>
@@ -196,7 +223,7 @@ const SearchResults = () => {
                         >
                           View Tickets
                         </a>
-                        {event.venue && (
+                        {event.venue && isMobile && (
                           <a
                             href={getUberLink(event.venue, event.name)}
                             target="_blank"

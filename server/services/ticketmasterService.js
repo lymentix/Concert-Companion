@@ -123,7 +123,7 @@ async function searchConcerts(options = {}) {
     throw new Error('Ticketmaster API key not configured. Set TICKETMASTER_API_KEY in the environment.');
   }
 
-  const { city, genre, size = 20 } = options;
+  const { city, genre, artist, size = 20 } = options;
 
   const params = {
     apikey: apiKey,
@@ -135,6 +135,7 @@ async function searchConcerts(options = {}) {
 
   if (city) params.city = city;
   if (genre) params.classificationName = genre;
+  if (artist) params.keyword = artist;
 
   try {
     const response = await axios.get(`${TICKETMASTER_API_BASE}/events.json`, { params });
