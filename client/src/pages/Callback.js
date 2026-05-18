@@ -12,16 +12,7 @@ const Callback = () => {
     const exchangeCodeForToken = async () => {
       if (hasAttemptedExchange.current) return;
       hasAttemptedExchange.current = true;
-      
-      // Check if we already have a token
-      const existingToken = localStorage.getItem('spotify_access_token');
-      if (existingToken) {
-        console.log('Token already exists, redirecting...');
-        setStatus('Already authenticated! Redirecting...');
-        setTimeout(() => navigate('/dashboard'), 1000);
-        return;
-      }
-      
+
       try {
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
@@ -61,6 +52,7 @@ const Callback = () => {
         localStorage.setItem('spotify_access_token', tokenData.access_token);
         localStorage.setItem('spotify_refresh_token', tokenData.refresh_token);
         localStorage.setItem('spotify_user_id', tokenData.user.spotify_id);
+        localStorage.setItem('app_token', tokenData.app_token);
 
         setStatus('Success! Fetching your music data...');
         

@@ -107,6 +107,52 @@ async function getEventsForArtist(artistName, options = {}) {
   }
 }
 
+/**
+ * Search for upcoming music events by city and/or genre.
+ *
+ * @param {object} [options]
+ * @param {string} [options.city] - City name to search within.
+ * @param {string} [options.genre] - Music genre / classification name.
+ * @param {number} [options.size=20] - Number of events to return.
+ * @returns {Promise<object[]>} A list of normalized event objects.
+ */
+async function searchConcerts(options = {}) {
+  const apiKey = process.env.TICKETMASTER_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Ticketmaster API key not configured. Set TICKETMASTER_API_KEY in the environment.');
+  }
+
+  const { city, genre, artist, size = 20 } = options;
+
+  const params = {
+    apikey: apiKey,
+    size,
+    sort: 'date,asc',
+    segmentName: 'Music',
+    locale: '*',
+  };
+
+  if (city) params.city = city;
+  if (genre) params.classificationName = genre;
+  if (artist) params.keyword = artist;
+
+  try {
+    const response = await axios.get(`${TICKETMASTER_API_BASE}/events.json`, { params });
+    const events = response.data?._embedded?.events || [];
+    return events.map(transformEvent).filter(Boolean);
+  } catch (error) {
+    const status = error.response?.status;
+    const message = error.response?.data?.fault?.faultstring || error.response?.data?.message || error.message;
+    console.error('Ticketmaster search error:', message);
+
+    if (status === 404) return [];
+
+    throw new Error(`Concert search failed: ${message}`);
+  }
+}
+
 module.exports = {
   getEventsForArtist,
+  searchConcerts,
 };
